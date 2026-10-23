@@ -131,7 +131,7 @@ jobs:
           node-version: '20'
       - name: Cache MLX Darwin release payload
         if: ${{ startsWith(matrix.os, 'macos') }}
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cache/mlx-darwin-release
           # Key on every payload input so a source-built payload survives pushes.
@@ -196,7 +196,7 @@ jobs:
             MLX_C_VERSION
       - name: Cache MLX Darwin release payload
         if: ${{ startsWith(matrix.os, 'macos') }}
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cache/mlx-darwin-release
           # Key on every payload input so a source-built payload survives pushes.
