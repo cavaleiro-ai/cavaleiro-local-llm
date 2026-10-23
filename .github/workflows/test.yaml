@@ -126,7 +126,7 @@ jobs:
             LLAMA_CPP_VERSION
             MLX_VERSION
             MLX_C_VERSION
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
       - name: Cache MLX Darwin release payload
@@ -204,7 +204,7 @@ jobs:
       - name: Prepare MLX Darwin release payload
         if: ${{ startsWith(matrix.os, 'macos') }}
         run: .github/scripts/prepare_mlx_darwin.sh
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
       # app/ui embeds app/dist, so the UI has to be built before app/... will
