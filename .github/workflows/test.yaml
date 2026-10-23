@@ -1,0 +1,218 @@
+# Cavaleiro Local LLM: the native superbuild jobs (`linux`, `windows`) run on
+# self-hosted runners and were moved to .github/workflows-disabled/test-native-selfhosted.yaml.
+# See .github/workflows-disabled/README.md.
+name: test
+
+concurrency:
+  # For PRs, later CI runs preempt previous ones. e.g. a force push on a PR
+  # cancels running CI jobs and starts all new ones.
+  #
+  # For non-PR pushes, concurrency.group needs to be unique for every distinct
+  # CI run we want to have happen. Use run_id, which in practice means all
+  # non-PR CI runs will be allowed to run without preempting each other.
+  group: ${{ github.workflow }}-$${{ github.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths:
+      - '**/*'
+      - '!docs/**'
+      - '!README.md'
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changes.outputs.changed }}
+      app_changed: ${{ steps.changes.outputs.app_changed }}
+      go_mod_changed: ${{ steps.changes.outputs.go_mod_changed }}
+      enginehash: ${{ steps.changes.outputs.enginehash }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: changes
+        run: |
+          changed() {
+            local BASE=${{ github.event.pull_request.base.sha }}
+            local HEAD=${{ github.event.pull_request.head.sha }}
+            local MERGE_BASE=$(git merge-base $BASE $HEAD)
+            git diff-tree -r --no-commit-id --name-only "$MERGE_BASE" "$HEAD" \
+              | xargs python3 -c "import sys; from pathlib import Path; print(any(Path(x).match(glob) for x in sys.argv[1:] for glob in '$*'.split(' ')))"
+          }
+
+          echo changed=$(changed \
+            'CMakeLists.txt' \
+            'CMakePresets.json' \
+            'cmake/**' \
+            'cmake/**/*' \
+            'llama/server/**/*' \
+            'llama/compat/**/*' \
+            'LLAMA_CPP_VERSION' \
+            'MLX_VERSION' \
+            'MLX_C_VERSION' \
+            'mlx/CMakeLists.txt' \
+            'mlx/compat/**' \
+            'mlx/compat/**/*' \
+            'mlxrunner/xgrammar/native/**' \
+            'mlxrunner/xgrammar/native/**/*' \
+            '.github/**/*') | tee -a $GITHUB_OUTPUT
+          echo app_changed=$(changed 'app/**' 'app/**/*') | tee -a $GITHUB_OUTPUT
+          echo go_mod_changed=$(changed 'go.mod') | tee -a $GITHUB_OUTPUT
+          echo enginehash=$(cat LLAMA_CPP_VERSION)-$(cat MLX_VERSION)-$(cat MLX_C_VERSION) | tee -a $GITHUB_OUTPUT
+
+  patches:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify patches apply cleanly
+        shell: bash
+        run: |
+          cmake -S llama/server -B "$RUNNER_TEMP/llama-server-patch-check" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DGGML_BACKEND_DL=ON \
+            -DGGML_NATIVE=OFF \
+            -DGGML_OPENMP=OFF \
+            -DGGML_CPU_ALL_VARIANTS=ON \
+            -DOLLAMA_RUNNER_DIR=
+
+  go_mod_tidy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: check that 'go mod tidy' is clean
+        run: go mod tidy --diff || (echo "Please run 'go mod tidy'." && exit 1)
+
+  go_license:
+    needs: [changes]
+    if: needs.changes.outputs.go_mod_changed == 'True'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Verify Go dependency licenses
+        run: |
+          cmake -S . -B build/go-license \
+            -DOLLAMA_LLAMA_BACKENDS= \
+            -DOLLAMA_MLX_BACKENDS= \
+            "-DOLLAMA_GO_LICENSE_TARGETS=linux/amd64;linux/arm64;darwin/amd64;darwin/arm64;windows/amd64;windows/arm64"
+          cmake --build build/go-license --target ollama-go-license
+
+  test:
+    needs: [changes]
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      CGO_ENABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache-dependency-path: |
+            go.sum
+            LLAMA_CPP_VERSION
+            MLX_VERSION
+            MLX_C_VERSION
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Cache MLX Darwin release payload
+        if: ${{ startsWith(matrix.os, 'macos') }}
+        uses: actions/cache@v4
+        with:
+          path: .cache/mlx-darwin-release
+          # Key on every payload input so a source-built payload survives pushes.
+          key: mlx-darwin-${{ hashFiles('MLX_VERSION', 'MLX_C_VERSION', 'cmake/local.cmake', 'cmake/apply-git-patches.cmake', 'cmake/mlx/CMakeLists.txt', 'cmake/mlx/CMakePresets.json', 'mlx/CMakeLists.txt', 'mlx/compat/**', 'mlxrunner/xgrammar/native/**') }}
+      - name: Prepare MLX Darwin release payload
+        if: ${{ startsWith(matrix.os, 'macos') }}
+        run: .github/scripts/prepare_mlx_darwin.sh
+      - name: Install UI dependencies
+        working-directory: ./app/ui/app
+        run: npm ci
+      - name: Install tscriptify
+        run: |
+          go install github.com/tkrajina/typescriptify-golang-structs/tscriptify@latest
+      - name: Run UI tests
+        if: ${{ startsWith(matrix.os, 'ubuntu') }}
+        working-directory: ./app/ui/app
+        run: npm test
+      - name: Verify MLX generated files are current
+        if: ${{ startsWith(matrix.os, 'ubuntu') }}
+        run: |
+          cmake -S . -B build/mlx-generate -DOLLAMA_MLX_BACKENDS=cuda_v13
+          cmake --build build/mlx-generate --target ollama-mlx-generate-wrappers
+          git diff --exit-code -- \
+            mlx/generated.h \
+            mlx/generated.c \
+            mlx/include/mlx/c
+      - name: Run go generate
+        run: go generate ./...
+
+      - name: Verify UI generated types are current
+        if: ${{ startsWith(matrix.os, 'ubuntu') }}
+        run: git diff --exit-code -- app/ui/app/codegen/gotypes.gen.ts
+
+      - name: go test
+        if: always()
+        # Smoke-run each benchmark once to catch panics and bit rot; this does
+        # not assert timings. -benchtime without -bench is inert.
+        run: go test -count=1 -bench=. -benchtime=1x ./...
+
+      - name: go test app with live updater tag
+        if: ${{ needs.changes.outputs.app_changed == 'True' && contains(fromJSON('["macos-latest","windows-latest"]'), matrix.os) }}
+        run: go test -count=1 -tags updater_live ./app/...
+
+      - uses: golangci/golangci-lint-action@v9
+
+  race:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      CGO_ENABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache-dependency-path: |
+            go.sum
+            LLAMA_CPP_VERSION
+            MLX_VERSION
+            MLX_C_VERSION
+      - name: Cache MLX Darwin release payload
+        if: ${{ startsWith(matrix.os, 'macos') }}
+        uses: actions/cache@v4
+        with:
+          path: .cache/mlx-darwin-release
+          # Key on every payload input so a source-built payload survives pushes.
+          key: mlx-darwin-${{ hashFiles('MLX_VERSION', 'MLX_C_VERSION', 'cmake/local.cmake', 'cmake/apply-git-patches.cmake', 'cmake/mlx/CMakeLists.txt', 'cmake/mlx/CMakePresets.json', 'mlx/CMakeLists.txt', 'mlx/compat/**', 'mlxrunner/xgrammar/native/**') }}
+      - name: Prepare MLX Darwin release payload
+        if: ${{ startsWith(matrix.os, 'macos') }}
+        run: .github/scripts/prepare_mlx_darwin.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # app/ui embeds app/dist, so the UI has to be built before app/... will
+      # even compile.
+      - name: Build UI
+        working-directory: ./app/ui/app
+        run: |
+          npm ci
+          npm run build
+      - name: go test -race
+        run: go test -race -count=1 ./...

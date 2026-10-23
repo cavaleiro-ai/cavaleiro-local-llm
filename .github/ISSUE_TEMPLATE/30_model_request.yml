@@ -1,0 +1,25 @@
+name: Model support request
+description: Request support for a model architecture that does not load or run correctly.
+title: "[Model]: "
+labels: [model request, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Cavaleiro Local LLM runs models with llama.cpp and MLX. New architectures usually land in the original project first.
+        This project does not host a model library; `ollama pull` uses the ollama.com registry.
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      description: Name and link (for example a Hugging Face repository).
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: What happens?
+      description: The command you ran, the error, and the model format (GGUF or safetensors).
+      render: shell
+    validations:
+      required: true

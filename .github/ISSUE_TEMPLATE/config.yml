@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability (private)
+    url: https://github.com/cavaleiro-ai/cavaleiro-local-llm/security/advisories/new
+    about: Please report vulnerabilities privately, never in a public issue.
+  - name: Read the contributing guide
+    url: https://github.com/cavaleiro-ai/cavaleiro-local-llm/blob/main/CONTRIBUTING.md
+    about: How to build, test, and propose changes.
+  - name: Troubleshooting
+    url: https://github.com/cavaleiro-ai/cavaleiro-local-llm/blob/main/docs/troubleshooting.mdx
+    about: Logs, GPU detection, and common problems.

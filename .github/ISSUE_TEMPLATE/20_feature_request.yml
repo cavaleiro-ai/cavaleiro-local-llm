@@ -1,0 +1,43 @@
+name: Feature request
+description: Suggest an improvement to Cavaleiro Local LLM.
+title: "[Feature]: "
+labels: [feature request, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Good proposals describe a **real problem** first, then the smallest change that solves it.
+        New API fields and environment variables are hard to remove later, and the API must stay compatible with existing clients, so please explain why the change is worth that cost.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is hard, confusing, slow, or risky today? Who hits it, and when?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: The smallest change that would solve it. Name the packages or commands you expect to touch.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches, including "do nothing", and why they are worse.
+  - type: textarea
+    id: verification
+    attributes:
+      label: How would we verify it?
+      description: The test, command, or observable behavior that proves the change works.
+    validations:
+      required: true
+  - type: checkboxes
+    id: compatibility
+    attributes:
+      label: Compatibility
+      options:
+        - label: The change keeps the `ollama` command, the `OLLAMA_*` environment variables, the REST API, and the default port compatible.
+          required: true

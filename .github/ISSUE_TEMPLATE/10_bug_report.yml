@@ -1,0 +1,95 @@
+name: Bug report
+labels: [bug, triage]
+description: Something in Cavaleiro Local LLM isn't working right.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem. Please **do not** paste secrets, API keys, private model names, or prompts you cannot share.
+        Security issues must be reported privately — see [SECURITY.md](https://github.com/cavaleiro-ai/cavaleiro-local-llm/blob/main/SECURITY.md).
+        If the problem also happens with the original project, please say so in the report.
+  - type: textarea
+    id: description
+    attributes:
+      label: What is the issue?
+      description: What happened? What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: The exact commands, API requests, or Modelfile you used, in order.
+      placeholder: |
+        1. ollama serve
+        2. curl http://localhost:11434/api/chat -d '{...}'
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Please copy and paste any relevant log output (for example with `OLLAMA_DEBUG=1`). See the [troubleshooting guide](https://github.com/cavaleiro-ai/cavaleiro-local-llm/blob/main/docs/troubleshooting.mdx) for where the logs live. Redact anything sensitive.
+      render: shell
+    validations:
+      required: false
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      description: Which operating system are you using?
+      multiple: true
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - Docker
+        - WSL2
+    validations:
+      required: false
+  - type: dropdown
+    id: gpu
+    attributes:
+      label: GPU
+      description: Which GPU are you using?
+      multiple: true
+      options:
+        - Nvidia
+        - AMD
+        - Intel
+        - Apple
+        - Other
+    validations:
+      required: false
+  - type: dropdown
+    id: cpu
+    attributes:
+      label: CPU
+      description: Which CPU are you using?
+      multiple: true
+      options:
+        - Intel
+        - AMD
+        - Apple
+        - Other
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `ollama --version`, plus the Cavaleiro Local LLM release or commit you built from.
+      placeholder: e.g., ollama version 0.0.0, cavaleiro-local-llm 1.0.0 (commit abc1234)
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: I removed secrets, tokens, and private data from this report.
+          required: true

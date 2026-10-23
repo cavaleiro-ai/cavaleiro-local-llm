@@ -1,0 +1,13 @@
+# Keeps the GitHub Actions used by the CI workflows current. Go modules are
+# not tracked here: dependencies follow the original project to keep merges simple.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    labels:
+      - dependencies
+      - ci
